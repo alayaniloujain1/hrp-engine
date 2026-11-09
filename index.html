@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HRP Allocation Engine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0c1016; --panel:#121923; --panel2:#17202c; --line:#243042; --ink:#e7ecf3; --mute:#8b98ab;
+  --amber:#e9b44c; --buy:#4cc9a6; --sell:#ff7b6b; --blue:#6aa7ff;
+  --mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+  --sans:'IBM Plex Sans',system-ui,-apple-system,Segoe UI,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 var(--sans)}
+body{display:grid;grid-template-columns:300px 1fr;min-height:100vh}
+aside{background:var(--panel);border-right:1px solid var(--line);padding:20px 18px;position:sticky;top:0;height:100vh;overflow:auto}
+main{padding:22px 26px 60px;min-width:0}
+h1{font-size:15px;letter-spacing:.14em;text-transform:uppercase;margin:0 0 2px;color:var(--amber);font-weight:600}
+.sub{color:var(--mute);font-size:12px;margin-bottom:20px}
+label{display:block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);margin:14px 0 5px}
+input,select,textarea{width:100%;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:8px 10px;font:13px var(--mono)}
+textarea{resize:vertical;min-height:84px}
+input:focus,select:focus,textarea:focus{outline:1px solid var(--amber);border-color:var(--amber)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+button{font:500 13px var(--sans);border-radius:6px;border:1px solid var(--line);background:var(--panel2);color:var(--ink);padding:9px 12px;cursor:pointer}
+button:hover{border-color:var(--amber)}
+button.primary{background:var(--amber);color:#1a1405;border-color:var(--amber);font-weight:600;width:100%;margin-top:18px}
+button.primary:disabled{opacity:.5;cursor:wait}
+.btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.btns button{flex:1}
+.top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+.pill{font:12px var(--mono);padding:4px 10px;border-radius:99px;border:1px solid var(--line);color:var(--mute)}
+.pill.ok{color:var(--buy);border-color:#245a4b}.pill.warn{color:var(--amber);border-color:#6b5420}.pill.bad{color:var(--sell);border-color:#6b2f29}
+.spacer{flex:1}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:18px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:13px 15px}
+.kpi .l{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute)}
+.kpi .v{font:500 24px var(--mono);margin-top:4px}
+.kpi .s{font-size:12px;color:var(--mute);margin-top:2px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin-bottom:18px}
+.card h2{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--mute);margin:0 0 12px;font-weight:500;display:flex;align-items:center;gap:10px}
+.card h2 .grow{flex:1}
+.grid2{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:18px}
+@media(max-width:1200px){.grid2{grid-template-columns:1fr}}
+@media(max-width:900px){body{grid-template-columns:1fr}aside{position:static;height:auto}}
+table{width:100%;border-collapse:collapse;font:13px var(--mono)}
+th{font:500 11px var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--mute);text-align:right;padding:6px 8px;border-bottom:1px solid var(--line)}
+td{padding:6px 8px;text-align:right;border-bottom:1px solid #1a2431;white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+td.tk{font-weight:500}
+td .name{color:var(--mute);font:11px var(--sans);margin-left:6px}
+td input{width:74px;padding:4px 6px;text-align:right}
+.buy{color:var(--buy)}.sell{color:var(--sell)}
+.bar{position:relative;height:10px;width:140px;background:#0e141c;border-radius:3px;display:inline-block;vertical-align:middle}
+.bar i{position:absolute;top:0;bottom:0;border-radius:3px}
+.bar .mid{position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:var(--line)}
+.scroll{overflow:auto}
+.empty{color:var(--mute);padding:30px 0;text-align:center}
+.note{color:var(--mute);font-size:12px;margin-top:8px}
+svg text{font-family:var(--mono)}
+.legend{display:flex;align-items:center;gap:8px;font:11px var(--mono);color:var(--mute)}
+.legend i{display:inline-block;width:110px;height:8px;border-radius:2px;background:linear-gradient(90deg,#3b6fd8,#1b2430,#e0564a)}
+#toast{position:fixed;right:20px;bottom:20px;background:var(--panel2);border:1px solid var(--line);padding:10px 14px;border-radius:8px;max-width:360px;display:none;z-index:9}
+</style>
+</head>
+<body>
+<aside>
+  <h1>HRP Engine</h1>
+  <div class="sub">Hierarchical Risk Parity &amp; graph-clustered allocation</div>
+
+  <label>Universe (comma separated)</label>
+  <textarea id="tickers"></textarea>
+
+  <div class="row2">
+    <div><label>Lookback</label>
+      <select id="lookback"><option value="252">1y</option><option value="504" selected>2y</option><option value="756">3y</option><option value="1260">5y</option></select></div>
+    <div><label>Linkage</label>
+      <select id="linkage"><option>single</option><option>average</option><option>complete</option><option>ward</option></select></div>
+  </div>
+  <div class="row2">
+    <div><label>Covariance</label>
+      <select id="cov"><option value="sample">sample</option><option value="ewma">EWMA</option></select></div>
+    <div><label>Max weight %</label><input id="maxw" type="number" min="1" max="100" step="1" placeholder="none"></div>
+  </div>
+  <div class="row2">
+    <div><label>Drift trigger (pp)</label><input id="thr" type="number" value="3" min="0" step="0.5"></div>
+    <div><label>Portfolio value</label><input id="pv" type="number" min="1" step="1000"></div>
+  </div>
+  <div class="row2">
+    <div><label>Engine</label>
+      <select id="engine"><option value="native">native</option><option value="riskfolio">Riskfolio-Lib</option><option value="pypfopt">PyPortfolioOpt</option></select></div>
+    <div><label>Data</label>
+      <select id="source"><option value="auto">auto</option><option value="yfinance">yfinance only</option><option value="synthetic">synthetic</option></select></div>
+  </div>
+
+  <label>Manager webhook URL</label>
+  <input id="hook" placeholder="https://…">
+  <label>API key (if server requires one)</label>
+  <input id="key" type="password" placeholder="X-API-Key">
+
+  <button class="primary" id="run">Run optimization</button>
+  <div class="btns">
+    <button id="save">Save holdings</button>
+    <button id="apply" title="Set stored holdings equal to the HRP targets (simulated execution)">Mark executed</button>
+    <button id="reset">Reset</button>
+  </div>
+  <div class="note">Holdings are edited in the table. Save stores them on the server for the weekly n8n run.</div>
+</aside>
+
+<main>
+  <div class="top">
+    <div class="pill" id="src">no data yet</div>
+    <div class="pill" id="win"></div>
+    <div class="spacer"></div>
+    <div class="pill" id="trig">—</div>
+  </div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="grid2">
+    <div class="card"><h2>Dendrogram <span class="grow"></span><span class="legend">leaf bar = HRP weight</span></h2><div id="dendro" class="empty">Run an optimization to see the cluster tree.</div></div>
+    <div class="card"><h2>Correlation, quasi-diagonalized <span class="grow"></span><span class="legend">-1 <i></i> +1</span></h2><div id="heat" class="empty">—</div></div>
+  </div>
+
+  <div class="card"><h2>Holdings vs HRP target</h2>
+    <div class="scroll"><table id="wtable"><thead><tr>
+      <th>Asset</th><th>Current %</th><th>Target %</th><th>Drift pp</th><th>Drift</th><th>Risk contrib %</th><th>Ann. vol %</th></tr></thead>
+      <tbody></tbody></table></div>
+  </div>
+
+  <div class="card"><h2>Rebalancing trade basket <span class="grow"></span>
+      <button id="csv" disabled>Download CSV</button><button id="notify" disabled>Send to manager webhook</button></h2>
+    <div class="scroll" id="trades"><div class="empty">—</div></div>
+    <div class="note" id="tnote"></div>
+  </div>
+</main>
+<div id="toast"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const fmt = (x, d=2) => x == null ? '—' : Number(x).toFixed(d);
+let state = {portfolio:null, last:null, names:{}};
+
+function toast(msg, ms=4000){const t=$('toast');t.textContent=msg;t.style.display='block';clearTimeout(toast._t);toast._t=setTimeout(()=>t.style.display='none',ms)}
+
+async function api(path, body, method){
+  const headers = {'Content-Type':'application/json'};
+  const key = $('key').value || localStorage.getItem('hrp_key');
+  if (key) headers['X-API-Key'] = key;
+  const r = await fetch(path, {method: method || (body ? 'POST' : 'GET'), headers, body: body ? JSON.stringify(body) : undefined});
+  if (!r.ok){
+    let m = r.statusText; try { const j = await r.json(); m = typeof j.detail === 'string' ? j.detail : JSON.stringify(j.detail) } catch {}
+    throw new Error(`${r.status}: ${m}`);
+  }
+  return r.json();
+}
+
+function params(){
+  const mw = parseFloat($('maxw').value);
+  return {
+    tickers: $('tickers').value.split(/[\s,;]+/).map(s=>s.trim().toUpperCase()).filter(Boolean),
+    lookback_days: +$('lookback').value, linkage: $('linkage').value, cov_method: $('cov').value,
+    max_weight: isFinite(mw) ? mw/100 : null, engine: $('engine').value, source: $('source').value,
+  };
+}
+
+function currentWeights(){
+  const w = {};
+  document.querySelectorAll('#wtable input[data-t]').forEach(i => { const v = parseFloat(i.value); if (v > 0) w[i.dataset.t] = v/100; });
+  return w;
+}
+
+/* ---------- initial load ---------- */
+async function init(){
+  $('key').value = localStorage.getItem('hrp_key') || '';
+  try {
+    const c = await api('/api/config');
+    state.portfolio = c.portfolio;
+    $('tickers').value = Object.keys(c.portfolio.weights).join(', ');
+    $('pv').value = c.portfolio.value;
+    $('thr').value = c.defaults.threshold_pct;
+    state.names = c.universe;
+    renderHoldingsOnly();
+  } catch(e){ toast(e.message); }
+}
+
+function renderHoldingsOnly(){
+  const tb = document.querySelector('#wtable tbody');
+  const w = state.portfolio.weights;
+  tb.innerHTML = Object.keys(w).map(t => `<tr><td class="tk">${t}<span class="name">${state.names[t]||''}</span></td>
+    <td><input data-t="${t}" type="number" step="0.1" value="${(w[t]*100).toFixed(2)}"></td><td colspan="5" style="color:var(--mute)">run optimization</td></tr>`).join('');
+}
+
+/* ---------- run ---------- */
+async function run(){
+  const btn = $('run'); btn.disabled = true; btn.textContent = 'Optimizing…';
+  try {
+    const body = {...params(), threshold_pct: +$('thr').value, portfolio_value: +$('pv').value || null,
+                  current_weights: currentWeights(), notify: false};
+    const res = await api('/api/rebalance', body);
+    state.last = {res, body};
+    render(res);
+  } catch(e){ toast(e.message, 7000); }
+  finally { btn.disabled = false; btn.textContent = 'Run optimization'; }
+}
+
+function render(res){
+  const o = res.optimization;
+  const src = $('src'); src.textContent = 'data: ' + o.data_source; src.className = 'pill ' + (o.data_source === 'yfinance' ? 'ok' : 'warn');
+  $('win').textContent = `${o.window[0]} → ${o.window[1]} · ${o.n_obs} obs`;
+  const tr = $('trig');
+  tr.textContent = res.triggered ? `REBALANCE · max drift ${fmt(res.max_drift_pp,1)} pp > ${res.threshold_pct}` : `WITHIN TOLERANCE · max drift ${fmt(res.max_drift_pp,1)} pp`;
+  tr.className = 'pill ' + (res.triggered ? 'bad' : 'ok');
+  if (o.notes.length) toast(o.notes.join(' '), 7000);
+
+  const s = o.stats;
+  const cut = (1 - s.vol_hrp / s.vol_equal_weight) * 100;
+  $('kpis').innerHTML = [
+    ['HRP volatility', fmt(s.vol_hrp*100,1)+'%', `equal weight ${fmt(s.vol_equal_weight*100,1)}% · inv-vol ${fmt(s.vol_inverse_vol*100,1)}%`],
+    ['Vol vs equal weight', (cut>=0?'−':'+')+fmt(Math.abs(cut),0)+'%', 'annualised'],
+    ['Diversification ratio', fmt(s.diversification_ratio,2), 'weighted avg vol / portfolio vol'],
+    ['Effective N', fmt(s.effective_n,1), `of ${o.tickers.length} assets`],
+    ['Turnover to rebalance', fmt(res.turnover_pct,1)+'%', `${res.trade_count} trades`],
+  ].map(([l,v,sub])=>`<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${sub}</div></div>`).join('');
+
+  drawDendrogram(o);
+  drawHeatmap(o.correlation);
+  drawTable(res);
+  drawTrades(res);
+}
+
+/* ---------- dendrogram (horizontal, root left, leaves right) ---------- */
+function drawDendrogram(o){
+  const d = o.dendrogram, n = d.leaves.length, rowH = 24, padL = 10, treeW = 300, barW = 120, labelW = 70;
+  const W = padL + treeW + labelW + barW + 50, H = n*rowH + 20;
+  const maxH = Math.max(...d.dcoord.flat()) || 1;
+  const X = h => padL + treeW - (h/maxH)*treeW, Y = i => 10 + ((i-5)/10 + .5)*rowH;
+  const wmax = Math.max(...d.leaves.map(t => o.weights[t]));
+  let g = '';
+  d.icoord.forEach((ic,k) => {
+    const dc = d.dcoord[k];
+    g += `<polyline fill="none" stroke="#6aa7ff" stroke-opacity=".75" stroke-width="1.4" points="${ic.map((v,j)=>X(dc[j]).toFixed(1)+','+Y(v).toFixed(1)).join(' ')}"/>`;
+  });
+  d.leaves.forEach((t,i) => {
+    const y = 10 + (i+.5)*rowH, w = o.weights[t], bw = (w/wmax)*barW, x0 = padL+treeW+6;
+    g += `<text x="${x0}" y="${y+4}" font-size="12" fill="#e7ecf3">${t}</text>`;
+    g += `<rect x="${x0+labelW}" y="${y-6}" width="${bw.toFixed(1)}" height="12" rx="2" fill="#e9b44c"/>`;
+    g += `<text x="${x0+labelW+bw+6}" y="${y+4}" font-size="11" fill="#8b98ab">${(w*100).toFixed(1)}%</text>`;
+  });
+  $('dendro').className = '';
+  $('dendro').innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-height:${H}px">${g}</svg>`;
+}
+
+/* ---------- correlation heatmap ---------- */
+function corrColor(v){
+  // -1 blue, 0 dark, +1 red
+  const a = Math.min(1, Math.abs(v)), base=[27,36,48], hi = v>=0 ? [224,86,74] : [59,111,216];
+  return `rgb(${base.map((b,i)=>Math.round(b+(hi[i]-b)*a)).join(',')})`;
+}
+function drawHeatmap(c){
+  const n = c.labels.length, cell = Math.max(14, Math.min(30, Math.floor(430/n))), pad = 52, S = pad + n*cell;
+  let g = '';
+  c.matrix.forEach((row,i) => row.forEach((v,j) => {
+    g += `<rect x="${pad+j*cell}" y="${pad+i*cell}" width="${cell-1}" height="${cell-1}" rx="2" fill="${corrColor(v)}"><title>${c.labels[i]} / ${c.labels[j]}: ${v.toFixed(2)}</title></rect>`;
+  }));
+  c.labels.forEach((t,i) => {
+    g += `<text x="${pad-5}" y="${pad+i*cell+cell/2+3}" font-size="10" text-anchor="end" fill="#8b98ab">${t}</text>`;
+    g += `<text transform="translate(${pad+i*cell+cell/2+3},${pad-5}) rotate(-60)" font-size="10" fill="#8b98ab">${t}</text>`;
+  });
+  $('heat').className = '';
+  $('heat').innerHTML = `<svg viewBox="0 0 ${S+10} ${S+10}" width="100%" style="max-width:520px">${g}</svg>`;
+}
+
+/* ---------- holdings table ---------- */
+function drawTable(res){
+  const o = res.optimization, thr = res.threshold_pct, scale = Math.max(thr*3, ...res.drift.map(d=>Math.abs(d.drift_pp)));
+  const rows = [...res.drift].sort((a,b)=>Math.abs(b.drift_pp)-Math.abs(a.drift_pp));
+  document.querySelector('#wtable tbody').innerHTML = rows.map(d => {
+    const w = Math.min(50, Math.abs(d.drift_pp)/scale*50), over = d.drift_pp > 0;
+    const col = Math.abs(d.drift_pp) > thr ? (over ? 'var(--sell)' : 'var(--buy)') : '#4a5a70';
+    const bar = `<span class="bar"><span class="mid"></span><i style="background:${col};${over ? `left:50%;width:${w}%` : `right:50%;width:${w}%`}"></i></span>`;
+    return `<tr><td class="tk">${d.ticker}<span class="name">${state.names[d.ticker]||''}</span></td>
+      <td><input data-t="${d.ticker}" type="number" step="0.1" value="${(d.current*100).toFixed(2)}"></td>
+      <td>${fmt(d.target*100)}</td>
+      <td class="${Math.abs(d.drift_pp)>thr ? (over?'sell':'buy') : ''}">${d.drift_pp>0?'+':''}${fmt(d.drift_pp)}</td>
+      <td>${bar}</td>
+      <td>${fmt(o.stats.risk_contribution[d.ticker]*100,1)}</td>
+      <td>${fmt(o.stats.asset_vol[d.ticker]*100,1)}</td></tr>`;
+  }).join('');
+}
+
+/* ---------- trades ---------- */
+function drawTrades(res){
+  $('csv').disabled = !res.triggered; $('notify').disabled = !res.triggered;
+  if (!res.triggered){ $('trades').innerHTML = '<div class="empty">No trades: every position is within the drift tolerance.</div>'; $('tnote').textContent=''; return; }
+  $('trades').innerHTML = `<table><thead><tr><th>Asset</th><th>Side</th><th>Qty</th><th>Price</th><th>Value</th><th>Current %</th><th>Target %</th></tr></thead><tbody>` +
+    res.trades.map(t => `<tr><td class="tk">${t.ticker}</td><td class="${t.side==='BUY'?'buy':'sell'}">${t.side}</td>
+      <td>${t.quantity ?? '—'}</td><td>${fmt(t.price)}</td><td>${Number(t.trade_value).toLocaleString(undefined,{maximumFractionDigits:0})}</td>
+      <td>${fmt(t.current_weight_pct)}</td><td>${fmt(t.target_weight_pct)}</td></tr>`).join('') + '</tbody></table>';
+  $('tnote').textContent = `Breaches: ${res.breaches.join(', ')}. When triggered, every asset is traded back to its HRP target. Sells are listed first.`;
+}
+
+/* ---------- actions ---------- */
+$('run').onclick = run;
+$('key').onchange = () => localStorage.setItem('hrp_key', $('key').value);
+$('csv').onclick = () => {
+  const blob = new Blob([state.last.res.csv], {type:'text/csv'}), a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = `rebalance_basket_${new Date().toISOString().slice(0,10)}.csv`; a.click();
+};
+$('notify').onclick = async () => {
+  try {
+    const r = await api('/api/rebalance', {...state.last.body, notify: true, webhook_url: $('hook').value || null});
+    const w = r.webhook; toast(w && w.sent ? `Webhook delivered (HTTP ${w.status_code})` : `Webhook not sent: ${w ? w.error : 'unknown'}`, 6000);
+  } catch(e){ toast(e.message, 6000); }
+};
+$('save').onclick = async () => {
+  try { const p = await api('/api/portfolio', {value: +$('pv').value || 100000, weights: currentWeights()}, 'PUT'); state.portfolio = p; toast('Holdings saved'); }
+  catch(e){ toast(e.message); }
+};
+$('apply').onclick = async () => {
+  if (!confirm('Replace stored holdings with the current HRP targets (simulated execution)?')) return;
+  try { const p = await api('/api/portfolio/apply', params()); state.portfolio = p; toast('Holdings set to HRP targets'); await run(); }
+  catch(e){ toast(e.message); }
+};
+$('reset').onclick = async () => {
+  try { const p = await api('/api/portfolio/reset', {}); state.portfolio = p; $('tickers').value = Object.keys(p.weights).join(', '); renderHoldingsOnly(); toast('Holdings reset to defaults'); }
+  catch(e){ toast(e.message); }
+};
+init();
+</script>
+</body>
+</html>

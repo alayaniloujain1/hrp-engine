@@ -1,0 +1,18 @@
+services:
+  hrp-api:
+    build: .
+    env_file: .env
+    ports: ["8000:8000"]
+    volumes: ["./data:/srv/data"]      # persists current holdings
+    restart: unless-stopped
+  n8n:
+    image: n8nio/n8n:latest
+    ports: ["5678:5678"]
+    environment:
+      - GENERIC_TIMEZONE=Africa/Tunis
+      - TZ=Africa/Tunis
+    volumes: ["n8n_data:/home/node/.n8n"]
+    depends_on: [hrp-api]
+    restart: unless-stopped
+volumes:
+  n8n_data:
